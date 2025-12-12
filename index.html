@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wikidata Item View - Grouped Occupations</title>
+    <!-- Using Google Fonts for a clean, system-like appearance -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Using Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary-blue: #007bff;
+            --light-gray: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+            --text-heading: #343a40;
+            --card-bg: white;
+            --fab-size: 56px;
+            --ref-bg: #f1f8ff; /* Light blue for references */
+            --cancel-red: #dc3545;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-gray);
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+
+        /* --- Utility Classes and Layout --- */
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 80px; /* Space for FAB */
+        }
+
+        .header-card, .statement-list {
+            background-color: var(--card-bg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 10px;
+        }
+
+        /* --- Header Section --- */
+        .header-card {
+            padding: 20px;
+            text-align: center;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .item-label {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin: 0 0 4px 0;
+        }
+
+        .item-description {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin: 0 0 4px 0;
+        }
+
+        .item-image {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin: 10px auto;
+            border: 3px solid var(--primary-blue);
+        }
+
+        /* --- Statements Section --- */
+        .section-header {
+            font-size: 16px;
+            font-weight: 500;
+            color: var(--text-heading);
+            padding: 10px 20px;
+            margin-top: 10px;
+            border-bottom: 1px solid var(--border-color);
+            background-color: #e9ecef;
+        }
+
+        .statement-list {
+            padding: 0 20px;
+        }
+        
+        /* Individual Statement Block */
+        .statement-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .statement-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Header (always visible) - now stacked */
+        .statement-header {
+            display: flex;
+            flex-direction: column; 
+            align-items: flex-start;
+        }
+        
+        /* Row for the property label and action buttons */
+        .statement-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin-bottom: 5px; 
+        }
+
+        .property-label {
+            flex-grow: 1;
+            width: auto; 
+            font-size: 16px; 
+            font-weight: 700;
+            color: var(--text-heading);
+            padding-right: 10px;
+        }
+
+        /* Container for the main values when they are a list (like occupation) */
+        .value-details {
+            flex-grow: 1;
+            width: 100%; 
+            padding-right: 0;
+        }
+
+        /* Action Buttons Group */
+        .action-buttons {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        
+        /* Reference Count Badge Style */
+        .ref-count-badge {
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+            background-color: var(--text-muted);
+            border-radius: 9999px; /* Pill shape */
+            padding: 2px 6px;
+            margin-right: 10px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ref-count-badge.has-refs {
+            background-color: var(--primary-blue);
+        }
+
+        /* Expansion and Edit Buttons */
+        .expand-btn, .edit-btn {
+            background: none;
+            border: none;
+            color: var(--primary-blue);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 0 5px;
+            transition: transform 0.3s, color 0.2s;
+        }
+        
+        .edit-btn {
+            color: var(--text-muted); 
+            font-size: 16px;
+        }
+
+        .edit-btn:hover {
+            color: var(--primary-blue);
+        }
+        
+        .expand-btn.expanded i {
+            transform: rotate(45deg); 
+        }
+        
+        /* Details Panel (Initially hidden) - Now full width */
+        .details-panel {
+            margin-top: 10px;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        
+        /* --- Inner Grouped Value Styles (The "section inside a section") --- */
+        .grouped-value {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 15px;
+            border-bottom: 1px dotted var(--border-color);
+        }
+
+        .grouped-value:last-child {
+             border-bottom: none;
+        }
+
+        .value-and-badge {
+            display: flex;
+            align-items: center;
+            font-weight: 500;
+        }
+        
+        /* Badge specific for inner values */
+        .value-ref-badge {
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+            background-color: var(--text-muted);
+            border-radius: 9999px; 
+            padding: 1px 5px;
+            margin-left: 8px;
+            line-height: 1;
+        }
+        .value-ref-badge.has-refs {
+            background-color: var(--primary-blue);
+        }
+        
+        /* Inner Details (Qualifiers/References for a specific value) */
+        .inner-details-toggle {
+            background: none;
+            border: none;
+            color: var(--primary-blue);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+        
+        .inner-qualifiers {
+            background-color: var(--ref-bg);
+            padding: 5px 10px;
+            margin-top: 5px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .inner-qualifiers p {
+            margin: 3px 0;
+        }
+        
+        .inner-qualifiers strong {
+            color: var(--text-heading);
+            margin-right: 5px;
+        }
+
+        /* --- VIEW MODE STYLES --- */
+        .qualifiers h4, .references h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin: 15px 0 5px 0;
+            border-top: 1px dashed #eee;
+            padding-top: 5px;
+        }
+        
+        .qualifiers h4:first-child {
+             margin-top: 10px;
+             border-top: none; 
+        }
+
+        .qualifiers ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .qualifiers li {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 4px;
+        }
+
+        .qualifier-key {
+            color: var(--text-muted);
+            font-weight: 500;
+            margin-right: 5px;
+        }
+
+        .reference-box {
+            background-color: var(--ref-bg);
+            border-left: 3px solid var(--primary-blue);
+            padding: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            border-radius: 4px;
+        }
+
+        .reference-box a {
+            color: var(--primary-blue);
+            text-decoration: none;
+        }
+        
+        /* --- EDIT MODE STYLES --- */
+        .edit-mode {
+            padding-top: 5px;
+        }
+
+        .edit-mode h4 {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin: 15px 0 5px 0;
+            border-top: none;
+            padding-top: 0;
+        }
+
+        .edit-mode input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .qualifier-edit-item label {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 8px;
+        }
+
+        .save-btn, .cancel-btn {
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-top: 15px;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .save-btn {
+            background-color: var(--primary-blue);
+            color: white;
+            margin-right: 10px;
+        }
+        
+        .save-btn:hover { background-color: #0056b3; }
+        
+        .cancel-btn {
+            background-color: var(--cancel-red);
+            color: white;
+        }
+        
+        .cancel-btn:hover { background-color: #c82333; }
+
+
+        /* --- Floating Action Button (FAB) and Modal --- */
+        .fab-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .fab {
+            width: var(--fab-size);
+            height: var(--fab-size);
+            border-radius: 50%;
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            font-size: 24px;
+            line-height: var(--fab-size);
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        
+        .action-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .action-content {
+            background-color: var(--card-bg);
+            width: 90%;
+            max-width: 400px;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- 1. Header Card (Item Label, Description, Image) -->
+    <div class="header-card">
+        <img class="item-image" src="https://placehold.co/80x80/007bff/ffffff?text=DA" onerror="this.onerror=null;this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/1/1d/Douglas_Adams.jpg/120px-Douglas_Adams.jpg';" alt="Portrait of Douglas Adams">
+        <h1 class="item-label">Douglas Adams</h1>
+        <p class="item-description">English writer and humorist</p>
+        <p class="item-qid">Q42</p>
+    </div>
+
+    <!-- 2. Statements Section -->
+    <h2 class="section-header">Statements</h2>
+    <div class="statement-list">
+        
+        <!-- Statement 1: Instance Of -->
+        <div class="statement-item" data-statement-id="P31-S1">
+            <div class="statement-header">
+                <div class="statement-title-row">
+                    <div class="property-label">instance of</div>
+                    <div class="action-buttons">
+                         <span class="ref-count-badge has-refs">2 refs</span>
+                        <button class="edit-btn" data-statement-id="P31-S1" title="Edit Statement">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="expand-btn" data-target-id="P31-S1-details">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="value-details">
+                    <span class="main-value" id="P31-S1-value-view">human</span>
+                </div>
+            </div>
+            
+            <div class="details-panel" id="P31-S1-details">
+                <!-- VIEW MODE -->
+                <div class="view-mode" id="P31-S1-view-mode">
+                    <div class="qualifiers">
+                        <h4>Qualifiers:</h4>
+                        <ul>
+                            <li><span class="qualifier-key">valid in period:</span> <span class="qualifier-value" id="P31-S1-qual1-view">1952 – 2001</span></li>
+                            <li><span class="qualifier-key">stated as:</span> <span class="qualifier-value" id="P31-S1-qual2-view">mammal</span></li>
+                        </ul>
+                    </div>
+                    <div class="references">
+                        <h4>References (2 total):</h4>
+                        <div class="reference-box" id="P31-S1-ref1-view">
+                            <i class="fas fa-link"></i> Retrieved from <a href="#">Encyclopedia Britannica</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- EDIT MODE -->
+                <div class="edit-mode" id="P31-S1-edit-mode" style="display: none;">
+                    <h4>Edit Value:</h4>
+                    <input type="text" id="P31-S1-value-input" value="human" class="value-input" data-field="main-value">
+                    <!-- ... simplified edit fields ... -->
+                    <button class="save-btn" onclick="saveStatement('P31-S1')">Save</button>
+                    <button class="cancel-btn" onclick="cancelEdit('P31-S1')">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statement 2: Date of Birth -->
+        <div class="statement-item" data-statement-id="P569-S1">
+            <div class="statement-header">
+                <div class="statement-title-row">
+                    <div class="property-label">date of birth</div>
+                    <div class="action-buttons">
+                        <span class="ref-count-badge has-refs">1 ref</span>
+                        <button class="edit-btn" data-statement-id="P569-S1" title="Edit Statement">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="expand-btn" data-target-id="P569-S1-details">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="value-details">
+                    <span class="main-value" id="P569-S1-value-view"><i class="far fa-calendar-alt"></i> 11 March 1952</span>
+                </div>
+            </div>
+            <div class="details-panel" id="P569-S1-details">
+                <div class="view-mode" id="P569-S1-view-mode">
+                    <div class="references">
+                        <h4>References (1 total):</h4>
+                        <div class="reference-box">
+                            <i class="fas fa-book"></i> Source: <a href="#">Birth Certificate scan</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="edit-mode" id="P569-S1-edit-mode" style="display: none;">
+                    <h4>Edit Date:</h4>
+                    <input type="text" id="P569-S1-value-input" value="1952-03-11" class="value-input" placeholder="YYYY-MM-DD">
+                    <button class="save-btn" onclick="saveStatement('P569-S1')">Save</button>
+                    <button class="cancel-btn" onclick="cancelEdit('P569-S1')">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statement 3: Occupation (The Grouped Section) -->
+        <div class="statement-item" data-statement-id="P106-Grouped">
+            <div class="statement-header">
+                <div class="statement-title-row">
+                    <!-- The property label for the whole group -->
+                    <div class="property-label">occupation</div>
+                    <div class="action-buttons">
+                        <!-- Total references for the property (1+2+1+0+1+0+1+1 = 7) -->
+                        <span class="ref-count-badge has-refs">7 total refs</span> 
+                        <button class="edit-btn" data-statement-id="P106-Grouped" title="Edit Occupation">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="expand-btn" data-target-id="P106-Grouped-details">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- Show a summary of the values when collapsed -->
+                <div class="value-details">
+                    <span class="main-value" id="P106-Grouped-summary">playwright, screenwriter, novelist, and 5 others</span>
+                </div>
+            </div>
+            
+            <div class="details-panel" id="P106-Grouped-details">
+                <!-- VIEW MODE: Displaying the 8 values as nested sections -->
+                <div class="view-mode" id="P106-Grouped-view-mode">
+                    <!-- The container for the 8 distinct values -->
+                    <div class="all-values-container">
+                        <h4 style="border-top: none;">Values (8 total):</h4>
+
+                        <!-- Value 1: playwright (0 references) -->
+                        <div class="grouped-value" data-value-id="playwright">
+                            <div class="value-and-badge">
+                                <span>playwright</span>
+                                <span class="value-ref-badge">0 refs</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('playwright-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="playwright-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p style="color: var(--cancel-red);">No references or qualifiers.</p>
+                            </div>
+                        </div>
+
+                        <!-- Value 2: screenwriter (2 references) -->
+                        <div class="grouped-value" data-value-id="screenwriter">
+                            <div class="value-and-badge">
+                                <span>screenwriter</span>
+                                <span class="value-ref-badge has-refs">2 refs</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('screenwriter-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="screenwriter-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p><strong>References:</strong> IMDb Credits, BBC Archives</p>
+                            </div>
+                        </div>
+
+                        <!-- Value 3: novelist (1 reference, with start time qualifier) -->
+                        <div class="grouped-value" data-value-id="novelist">
+                            <div class="value-and-badge">
+                                <span>novelist</span>
+                                <span class="value-ref-badge has-refs">1 ref</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('novelist-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="novelist-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p><strong>Qualifier:</strong> start time: 1979</p>
+                                <p><strong>References:</strong> First Novel Publication</p>
+                            </div>
+                        </div>
+
+                        <!-- Value 4: children's writer (0 references) -->
+                        <div class="grouped-value" data-value-id="children's writer">
+                            <div class="value-and-badge">
+                                <span>children's writer</span>
+                                <span class="value-ref-badge">0 refs</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('childrens-writer-inner')">
+                                Details
+                            </button>
+                        </div>
+                         <div class="inner-details-panel" id="childrens-writer-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p style="color: var(--cancel-red);">No references or qualifiers.</p>
+                            </div>
+                        </div>
+
+                        <!-- Value 5: science fiction writer (1 reference) -->
+                        <div class="grouped-value" data-value-id="science fiction writer">
+                            <div class="value-and-badge">
+                                <span>science fiction writer</span>
+                                <span class="value-ref-badge has-refs">1 ref</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('sf-writer-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="sf-writer-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p><strong>References:</strong> Science Fiction Hall of Fame</p>
+                            </div>
+                        </div>
+
+                        <!-- Value 6: comedian (0 references) -->
+                        <div class="grouped-value" data-value-id="comedian">
+                            <div class="value-and-badge">
+                                <span>comedian</span>
+                                <span class="value-ref-badge">0 refs</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('comedian-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="comedian-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p style="color: var(--cancel-red);">No references or qualifiers.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Value 7: writer (1 reference) -->
+                        <div class="grouped-value" data-value-id="writer">
+                            <div class="value-and-badge">
+                                <span>writer</span>
+                                <span class="value-ref-badge has-refs">1 ref</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('writer-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="writer-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p><strong>References:</strong> New York Times Article</p>
+                            </div>
+                        </div>
+
+                        <!-- Value 8: musician (1 reference) -->
+                        <div class="grouped-value" data-value-id="musician">
+                            <div class="value-and-badge">
+                                <span>musician</span>
+                                <span class="value-ref-badge has-refs">1 ref</span>
+                            </div>
+                            <button class="inner-details-toggle" onclick="toggleInnerDetails('musician-inner')">
+                                Details
+                            </button>
+                        </div>
+                        <div class="inner-details-panel" id="musician-inner" style="display:none;">
+                            <div class="inner-qualifiers">
+                                <p><strong>References:</strong> Bandmate Interview</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                
+                <!-- EDIT MODE: Simplified for a group -->
+                <div class="edit-mode" id="P106-Grouped-edit-mode" style="display: none;">
+                    <h4>Edit Occupations (Add/Remove/Modify):</h4>
+                    <p style="font-size: 14px; color: var(--text-muted); margin-bottom: 10px;">
+                        In a real application, this would be a complex component for managing all 8 values, their qualifiers, and references.
+                    </p>
+                    <input type="text" id="P106-Grouped-input" value="playwright; screenwriter; novelist; children's writer; science fiction writer; comedian; writer; musician" class="value-input">
+                    <button class="save-btn" onclick="saveStatement('P106-Grouped')">Save</button>
+                    <button class="cancel-btn" onclick="cancelEdit('P106-Grouped')">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statement 4: Date of Death -->
+        <div class="statement-item" data-statement-id="P570-S1">
+            <div class="statement-header">
+                <div class="statement-title-row">
+                    <div class="property-label">date of death</div>
+                    <div class="action-buttons">
+                         <span class="ref-count-badge has-refs">1 ref</span>
+                        <button class="edit-btn" data-statement-id="P570-S1" title="Edit Statement">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="expand-btn" data-target-id="P570-S1-details">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="value-details">
+                    <span class="main-value" id="P570-S1-value-view"><i class="far fa-calendar-alt"></i> 11 May 2001</span>
+                </div>
+            </div>
+             <div class="details-panel" id="P570-S1-details">
+                <div class="view-mode" id="P570-S1-view-mode">
+                    <div class="qualifiers">
+                        <h4>Qualifiers:</h4>
+                        <ul>
+                            <li><span class="qualifier-key">cause of death:</span> <span class="qualifier-value">Myocardial infarction</span></li>
+                        </ul>
+                    </div>
+                     <div class="references">
+                        <h4>References (1 total):</h4>
+                        <div class="reference-box">
+                            <i class="fas fa-newspaper"></i> Source: <a href="#">The Guardian Obituary</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="edit-mode" id="P570-S1-edit-mode" style="display: none;">
+                    <h4>Edit Date:</h4>
+                    <input type="text" id="P570-S1-value-input" value="2001-05-11" class="value-input" placeholder="YYYY-MM-DD">
+                    <button class="save-btn" onclick="saveStatement('P570-S1')">Save</button>
+                    <button class="cancel-btn" onclick="cancelEdit('P570-S1')">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 3. Aliases/Also Known As Section -->
+    <h2 class="section-header">Also known as</h2>
+    <div class="statement-list">
+        <div class="statement-item" data-statement-id="Aliases-S1">
+            <div class="statement-header">
+                <div class="statement-title-row">
+                    <div class="property-label">Aliases</div>
+                    <div class="action-buttons">
+                        <span class="ref-count-badge has-refs">2 refs</span>
+                        <button class="edit-btn" data-statement-id="Aliases-S1" title="Edit Statement">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="expand-btn" data-target-id="Aliases-details">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="value-details">
+                    <span class="main-value" id="Aliases-S1-value-view">Douglas Noël Adams, The Hitchhiker</span>
+                </div>
+            </div>
+            <div class="details-panel" id="Aliases-details">
+                <div class="view-mode" id="Aliases-S1-view-mode">
+                 <div class="qualifiers">
+                    <h4>Language Codes:</h4>
+                    <ul>
+                        <li><span class="qualifier-key">en:</span> <span class="qualifier-value">Douglas Adams</span></li>
+                        <li><span class="qualifier-key">fr:</span> <span class="qualifier-value">Douglas Noël Adams</span></li>
+                    </ul>
+                </div>
+                </div>
+                <div class="edit-mode" id="Aliases-S1-edit-mode" style="display: none;">
+                    <h4>Edit English Alias:</h4>
+                    <input type="text" id="Aliases-S1-value-input" value="Douglas Noël Adams" class="value-input">
+                    <button class="save-btn" onclick="saveStatement('Aliases-S1')">Save</button>
+                    <button class="cancel-btn" onclick="cancelEdit('Aliases-S1')">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. External Links Section (Simple display) -->
+    <h2 class="section-header">External links</h2>
+    <div class="statement-list">
+        <div class="statement-item" style="border-bottom: none; padding-bottom: 20px;">
+            <div class="statement-header" style="cursor: default;">
+                <div class="value-details">
+                    <span class="main-value"><a href="#">Official website</a></span>
+                    <span class="main-value"><a href="#">Library of Congress</a></span>
+                    <span class="main-value"><a href="#">IMDB page</a></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- 5. Floating Action Button (FAB) -->
+<div class="fab-container">
+    <button class="fab" id="addStatementFab" title="Add New Statement">
+        <i class="fas fa-plus"></i>
+    </button>
+</div>
+
+<!-- 6. Mock Modal/Action Screen -->
+<div class="action-screen" id="actionScreen">
+    <div class="action-content">
+        <h3>Statement Action</h3>
+        <p id="actionMessage">This modal is triggered by the FAB and represents a full-screen editing workflow.</p>
+        <button onclick="closeActionScreen()">Close</button>
+    </div>
+</div>
+
+<script>
+    // --- Modal/UI Control Functions (FAB) ---
+
+    const fab = document.getElementById('addStatementFab');
+    const actionScreen = document.getElementById('actionScreen');
+    const actionMessage = document.getElementById('actionMessage');
+
+    function openActionScreen(message) {
+        actionMessage.textContent = message;
+        actionScreen.style.display = 'flex';
+    }
+
+    function closeActionScreen() {
+        actionScreen.style.display = 'none';
+    }
+
+    // Event listener for the FAB (Add New Statement)
+    fab.addEventListener('click', () => {
+        openActionScreen('Initiating the "Add New Statement" flow...');
+    });
+
+    // Close the modal when clicking outside the content
+    actionScreen.addEventListener('click', (event) => {
+        if (event.target === actionScreen) {
+            closeActionScreen();
+        }
+    });
+
+
+    // --- Progressive Disclosure & Edit Logic ---
+    
+    /**
+     * Toggles the visibility of qualifiers/references for a specific value inside a grouped statement.
+     * @param {string} id - The ID of the inner-details-panel to toggle.
+     */
+    function toggleInnerDetails(id) {
+        const panel = document.getElementById(id);
+        if (panel) {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            // Recalculate the height of the parent details panel after toggling inner content
+            const parentPanel = panel.closest('.details-panel');
+            if (parentPanel) {
+                 // Use a small timeout to allow the inner element to render/unrender
+                setTimeout(() => setPanelHeight(parentPanel), 50); 
+            }
+        }
+    }
+
+
+    // Global function to set the height of the panel for smooth transition
+    function setPanelHeight(panel) {
+        // Temporarily display edit mode content if panel is hidden, to calculate height correctly
+        const editMode = panel.querySelector('.edit-mode');
+        const viewMode = panel.querySelector('.view-mode');
+        
+        // Save original states
+        const originalEditDisplay = editMode ? editMode.style.display : null;
+        const originalViewDisplay = viewMode ? viewMode.style.display : null;
+        
+        // Check if the panel is currently collapsed (maxHeight 0) or doesn't have the expanded class
+        const isCollapsed = panel.style.maxHeight === "0px" || !panel.parentElement.querySelector('.expand-btn')?.classList.contains('expanded');
+
+        // Force visible mode content to calculate the correct scrollHeight if we are currently collapsed
+        if (isCollapsed) {
+            // Check which content should be visible for height calculation (view or edit)
+            if (editMode && editMode.style.display === 'block') {
+                if (viewMode) viewMode.style.display = 'none';
+            } else if (viewMode) {
+                viewMode.style.display = 'block';
+                if (editMode) editMode.style.display = 'none';
+            }
+        }
+        
+        // Calculate height
+        panel.style.maxHeight = panel.scrollHeight + "px";
+
+        // Restore original states if we temporarily changed them
+        if (isCollapsed) {
+            if (editMode) editMode.style.display = originalEditDisplay;
+            if (viewMode) viewMode.style.display = originalViewDisplay;
+        }
+    }
+
+
+    // Global function to toggle expansion
+    function togglePanel(button, panel) {
+        const isExpanded = button.classList.toggle('expanded');
+        
+        if (isExpanded) {
+            panel.style.display = 'block';
+            setPanelHeight(panel);
+        } else {
+            panel.style.maxHeight = "0";
+            
+            // Ensure we are not left in edit mode when collapsing
+            cancelEdit(button.closest('.statement-item').dataset.statementId, true);
+        }
+    }
+
+    // Global function to enter edit mode
+    function enterEditMode(statementId) {
+        const panel = document.getElementById(statementId + '-details');
+        const editMode = document.getElementById(statementId + '-edit-mode');
+        const viewMode = document.getElementById(statementId + '-view-mode');
+        const expandBtn = panel.parentElement.querySelector('.expand-btn');
+
+        // 1. Ensure panel is expanded
+        if (!expandBtn.classList.contains('expanded')) {
+            togglePanel(expandBtn, panel);
+        }
+
+        // 2. Switch modes
+        viewMode.style.display = 'none';
+        editMode.style.display = 'block';
+        
+        // 3. Recalculate max-height after switching content
+        setPanelHeight(panel);
+    }
+
+    // Global function to save statement (mock)
+    function saveStatement(statementId) {
+        // Mock: Retrieve values from input fields and update display.
+        // For P106-Grouped, we only update the summary for this demo.
+        if (statementId === 'P106-Grouped') {
+             const input = document.getElementById('P106-Grouped-input').value;
+             const values = input.split(';').map(v => v.trim()).filter(v => v.length > 0);
+             const summarySpan = document.getElementById('P106-Grouped-summary');
+             
+             if (values.length > 2) {
+                 summarySpan.textContent = `${values[0]}, ${values[1]}, and ${values.length - 2} others`;
+             } else {
+                 summarySpan.textContent = values.join(', ');
+             }
+        } else {
+            const mainValueInput = document.getElementById(statementId + '-value-input');
+            const displayValueSpan = document.getElementById(statementId + '-value-view');
+
+            if (displayValueSpan && mainValueInput) {
+                if (!displayValueSpan.innerHTML.includes('fa-calendar-alt')) {
+                    displayValueSpan.textContent = mainValueInput.value;
+                } else {
+                    console.log(`Mock Save: ${statementId} updated to ${mainValueInput.value}`);
+                }
+            }
+        }
+        
+        // Exit edit mode
+        cancelEdit(statementId);
+    }
+    
+    // Global function to cancel edit mode
+    function cancelEdit(statementId, isCollapsing = false) {
+        const panel = document.getElementById(statementId + '-details');
+        const editMode = document.getElementById(statementId + '-edit-mode');
+        const viewMode = document.getElementById(statementId + '-view-mode');
+        
+        if (!editMode || !viewMode) return; 
+        
+        // 1. Switch back to view mode
+        editMode.style.display = 'none';
+        viewMode.style.display = 'block';
+
+        // 2. Recalculate max-height after switching content, only if staying expanded
+        if (!isCollapsing) {
+            setPanelHeight(panel);
+        }
+    }
+    
+    // Initial setup: Event listeners and panel collapse
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.expand-btn').forEach(button => {
+            const targetId = button.getAttribute('data-target-id');
+            const detailsPanel = document.getElementById(targetId);
+            if (detailsPanel) {
+                button.addEventListener('click', () => {
+                    togglePanel(button, detailsPanel);
+                });
+                detailsPanel.style.maxHeight = "0"; // Initial state: collapsed
+            }
+        });
+
+        // Event listeners setup for edit buttons
+        document.querySelectorAll('.edit-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const statementId = button.getAttribute('data-statement-id');
+                enterEditMode(statementId);
+            });
+        });
+    });
+</script>
+</body>
+</html>
